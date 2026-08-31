@@ -44,6 +44,6 @@ export const env = {
   googleTranslateApiKey: process.env.GOOGLE_TRANSLATE_API_KEY ?? '',
   openaiApiKey: process.env.OPENAI_API_KEY ?? '',
   openaiModel: process.env.OPENAI_MODEL ?? 'gpt-4o-mini',
-  dailyCostLimitUsd: readPositiveNumber(process.env.DAILY_COST_LIMIT_USD, 5, 'DAILY_COST_LIMIT_USD'),
+  dailyCostLimitUsd: readPositiveNumber(process.env.DAILY_COST_LIMIT_USD, 3, 'DAILY_COST_LIMIT_USD'),
   translationMaxChars: readPositiveNumber(process.env.TRANSLATION_MAX_CHARS, 500, 'TRANSLATION_MAX_CHARS'),
 };

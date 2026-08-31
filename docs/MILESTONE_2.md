@@ -56,6 +56,10 @@ Duas peças:
   pagas com `429 COST_LIMIT_REACHED` quando `DAILY_COST_LIMIT_USD` (padrão 5) é atingido.
   O guard existe uma vez por processo; os services são montados por request.
 
+O padrão é **US$3/dia** porque o crédito de trial do Google Cloud é de US$300 por
+90 dias: 300 ÷ 90 = 3,33. Com um teto maior, o pior caso queima o crédito antes do
+fim da janela de validação. Revisar quando a conta sair do trial.
+
 O consumo do dia aparece em `GET /health` e na resposta de `POST /recommendations`.
 
 Limitação conhecida: o contador é em memória, zera no restart e não soma entre

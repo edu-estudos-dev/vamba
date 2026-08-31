@@ -26,7 +26,7 @@ export class OpenAIProvider implements AIProvider {
           {
             role: 'system',
             content:
-              'Você ranqueia somente lugares candidatos fornecidos em JSON. Nunca invente placeId. Responda apenas no schema solicitado.',
+              'Você ranqueia somente lugares candidatos fornecidos em JSON. Nunca invente placeId. Responda apenas no schema solicitado. Escreva a explanation sempre em português do Brasil.',
           },
           {
             role: 'user',
