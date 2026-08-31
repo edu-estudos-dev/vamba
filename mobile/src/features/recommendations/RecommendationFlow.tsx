@@ -23,7 +23,12 @@ const demoLocation = {
   longitude: -9.1393,
 };
 
-export const RecommendationFlow = () => {
+type RecommendationFlowProps = {
+  onSaveFavorite?: (item: RecommendationItem) => void;
+  isFavorited?: (placeId: string) => boolean;
+};
+
+export const RecommendationFlow = ({ onSaveFavorite, isFavorited }: RecommendationFlowProps) => {
   const [category, setCategory] = useState<TravelCategory>('Conhecer');
   const [prompt, setPrompt] = useState('Tenho duas horas livres. O que vale a pena fazer agora?');
   const [statusMessage, setStatusMessage] = useState('Use sua localização ou teste com Lisboa.');
@@ -165,9 +170,19 @@ export const RecommendationFlow = () => {
             Avaliação {selectedItem.place.rating ?? '-'} • {selectedItem.place.reviewCount ?? 0} reviews
           </Text>
           <Text style={styles.detailLine}>Fonte: {selectedItem.place.source === 'mock' ? 'mock local' : 'provider externo'}</Text>
-          <Pressable onPress={() => openRoute(selectedItem)} style={styles.routeButton}>
-            <Text style={styles.routeButtonText}>Ir agora</Text>
-          </Pressable>
+          <View style={styles.detailActions}>
+            <Pressable onPress={() => openRoute(selectedItem)} style={styles.routeButton}>
+              <Text style={styles.routeButtonText}>Ir agora</Text>
+            </Pressable>
+            {onSaveFavorite && (
+              <Pressable
+                onPress={() => onSaveFavorite(selectedItem)}
+                style={[styles.favoriteButton, isFavorited?.(selectedItem.place.id) && styles.favoriteButtonActive]}
+              >
+                <Text style={styles.favoriteButtonText}>{isFavorited?.(selectedItem.place.id) ? '❤️' : '🤍'}</Text>
+              </Pressable>
+            )}
+          </View>
         </View>
       ) : null}
 
@@ -345,17 +360,40 @@ const styles = StyleSheet.create({
   detailLine: {
     color: '#60766f',
   },
+  detailActions: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 6,
+    alignItems: 'center',
+  },
   routeButton: {
-    alignSelf: 'flex-start',
+    flex: 1,
     backgroundColor: '#d8ad57',
     borderRadius: 8,
-    marginTop: 6,
     paddingHorizontal: 16,
     paddingVertical: 12,
+    alignItems: 'center',
   },
   routeButtonText: {
     color: '#16362f',
     fontWeight: '900',
+  },
+  favoriteButton: {
+    width: 48,
+    height: 48,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#e0e8e5',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#f7fbf8',
+  },
+  favoriteButtonActive: {
+    backgroundColor: '#ffe0e0',
+    borderColor: '#ff6b6b',
+  },
+  favoriteButtonText: {
+    fontSize: 20,
   },
   costNote: {
     color: '#60766f',
