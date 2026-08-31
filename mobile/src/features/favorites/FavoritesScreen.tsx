@@ -5,9 +5,10 @@ import type { Favorite } from './types';
 type FavoritesScreenProps = {
   favorites: Favorite[];
   onRemove: (placeId: string) => void;
+  onTrack?: (name: string, data?: Record<string, string | number>) => void;
 };
 
-export const FavoritesScreen = ({ favorites, onRemove }: FavoritesScreenProps) => {
+export const FavoritesScreen = ({ favorites, onRemove, onTrack }: FavoritesScreenProps) => {
   const handleOpenMap = (place: Favorite) => {
     const url = buildExternalMapUrl({
       platform: 'android',
@@ -15,7 +16,13 @@ export const FavoritesScreen = ({ favorites, onRemove }: FavoritesScreenProps) =
       longitude: place.longitude,
       label: place.name,
     });
+    onTrack?.('map_opened', { placeId: place.id, source: 'favorites' });
     Linking.openURL(url);
+  };
+
+  const handleRemove = (placeId: string) => {
+    onRemove(placeId);
+    onTrack?.('favorite_removed', { placeId });
   };
 
   if (favorites.length === 0) {
@@ -43,7 +50,7 @@ export const FavoritesScreen = ({ favorites, onRemove }: FavoritesScreenProps) =
             <Pressable style={styles.mapButton} onPress={() => handleOpenMap(place)}>
               <Text style={styles.mapButtonText}>Ir agora</Text>
             </Pressable>
-            <Pressable style={styles.removeButton} onPress={() => onRemove(place.id)}>
+            <Pressable style={styles.removeButton} onPress={() => handleRemove(place.id)}>
               <Text style={styles.removeButtonText}>Remover</Text>
             </Pressable>
           </View>

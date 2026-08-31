@@ -4,13 +4,16 @@ import { Pressable, SafeAreaView, StyleSheet, Text, View } from 'react-native';
 
 import { RecommendationFlow } from './src/features/recommendations/RecommendationFlow';
 import { FavoritesScreen } from './src/features/favorites/FavoritesScreen';
+import { AnalyticsScreen } from './src/features/analytics/AnalyticsScreen';
 import { useFavorites } from './src/features/favorites/useFavorites';
+import { useAnalytics } from './src/features/analytics/useAnalytics';
 
-type Tab = 'recommendations' | 'favorites';
+type Tab = 'recommendations' | 'favorites' | 'analytics';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<Tab>('recommendations');
   const { favorites, isLoaded, save, remove, isFavorited } = useFavorites();
+  const { track, getEvents, clearEvents } = useAnalytics();
 
   return (
     <View style={styles.root}>
@@ -29,12 +32,19 @@ export default function App() {
               Favoritos ({favorites.length})
             </Text>
           </Pressable>
+          <Pressable style={[styles.tab, activeTab === 'analytics' && styles.tabActive]} onPress={() => setActiveTab('analytics')}>
+            <Text style={[styles.tabText, activeTab === 'analytics' && styles.tabTextActive]}>
+              📊
+            </Text>
+          </Pressable>
         </View>
 
         {activeTab === 'recommendations' ? (
-          <RecommendationFlow onSaveFavorite={save} isFavorited={isFavorited} />
+          <RecommendationFlow onSaveFavorite={save} isFavorited={isFavorited} onTrack={track} />
+        ) : activeTab === 'favorites' ? (
+          <FavoritesScreen favorites={favorites} onRemove={remove} onTrack={track} />
         ) : (
-          <FavoritesScreen favorites={favorites} onRemove={remove} />
+          <AnalyticsScreen events={getEvents()} onClear={clearEvents} />
         )}
       </SafeAreaView>
       <StatusBar style="auto" />

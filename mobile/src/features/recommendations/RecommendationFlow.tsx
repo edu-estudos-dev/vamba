@@ -27,9 +27,10 @@ const demoLocation = {
 type RecommendationFlowProps = {
   onSaveFavorite?: (item: RecommendationItem) => void;
   isFavorited?: (placeId: string) => boolean;
+  onTrack?: (name: string, data?: Record<string, string | number>) => void;
 };
 
-export const RecommendationFlow = ({ onSaveFavorite, isFavorited }: RecommendationFlowProps) => {
+export const RecommendationFlow = ({ onSaveFavorite, isFavorited, onTrack }: RecommendationFlowProps) => {
   const [category, setCategory] = useState<TravelCategory>('Conhecer');
   const [prompt, setPrompt] = useState('Tenho duas horas livres. O que vale a pena fazer agora?');
   const [statusMessage, setStatusMessage] = useState('Use sua localização ou teste com Lisboa.');
@@ -67,6 +68,8 @@ export const RecommendationFlow = ({ onSaveFavorite, isFavorited }: Recommendati
       setIsLoading(false);
       return;
     }
+
+    onTrack?.('recommendation_requested', { category, prompt: prompt.substring(0, 50) });
 
     try {
       const nextRecommendation = await requestRecommendations({
@@ -148,7 +151,10 @@ export const RecommendationFlow = ({ onSaveFavorite, isFavorited }: Recommendati
           {recommendation.recommendations.map((item) => (
             <Pressable
               key={item.place.id}
-              onPress={() => setSelectedItem(item)}
+              onPress={() => {
+                setSelectedItem(item);
+                onTrack?.('place_viewed', { placeId: item.place.id, placeName: item.place.name });
+              }}
               style={[styles.resultItem, selectedItem?.place.id === item.place.id && styles.resultItemActive]}
             >
               <Text style={styles.resultName}>{item.rank}. {item.place.name}</Text>
@@ -172,12 +178,24 @@ export const RecommendationFlow = ({ onSaveFavorite, isFavorited }: Recommendati
           </Text>
           <Text style={styles.detailLine}>Fonte: {selectedItem.place.source === 'mock' ? 'mock local' : 'provider externo'}</Text>
           <View style={styles.detailActions}>
-            <Pressable onPress={() => openRoute(selectedItem)} style={styles.routeButton}>
+            <Pressable
+              onPress={() => {
+                openRoute(selectedItem);
+                onTrack?.('map_opened', { placeId: selectedItem.place.id });
+              }}
+              style={styles.routeButton}
+            >
               <Text style={styles.routeButtonText}>Ir agora</Text>
             </Pressable>
             {onSaveFavorite && (
               <Pressable
-                onPress={() => onSaveFavorite(selectedItem)}
+                onPress={() => {
+                  const isFav = isFavorited?.(selectedItem.place.id);
+                  onSaveFavorite(selectedItem);
+                  onTrack?.(isFav ? 'favorite_removed' : 'favorite_saved', {
+                    placeId: selectedItem.place.id,
+                  });
+                }}
                 style={[styles.favoriteButton, isFavorited?.(selectedItem.place.id) && styles.favoriteButtonActive]}
               >
                 <Text style={styles.favoriteButtonText}>{isFavorited?.(selectedItem.place.id) ? '❤️' : '🤍'}</Text>
