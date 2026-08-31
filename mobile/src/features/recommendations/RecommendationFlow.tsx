@@ -56,6 +56,12 @@ export const RecommendationFlow = () => {
   };
 
   const requestWithCoordinates = async (latitude: number, longitude: number, successMessage: string) => {
+    if (!prompt.trim()) {
+      setStatusMessage('Descreva o que você quer fazer.');
+      setIsLoading(false);
+      return;
+    }
+
     try {
       const nextRecommendation = await requestRecommendations({
         latitude,
@@ -66,8 +72,9 @@ export const RecommendationFlow = () => {
       setRecommendation(nextRecommendation);
       setSelectedItem(nextRecommendation.primaryRecommendation);
       setStatusMessage(successMessage);
-    } catch {
-      setStatusMessage('Não consegui falar com o backend. Confirme se o server está rodando.');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Erro desconhecido';
+      setStatusMessage(`Erro: ${message}`);
     } finally {
       setIsLoading(false);
     }

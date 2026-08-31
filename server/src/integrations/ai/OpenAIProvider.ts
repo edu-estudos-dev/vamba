@@ -1,14 +1,5 @@
 import type { AIProvider, RankedPlace } from './AIProvider.js';
 
-type OpenAIResponse = {
-  output?: Array<{
-    content?: Array<{
-      type?: string;
-      text?: string;
-    }>;
-  }>;
-};
-
 export class OpenAIProvider implements AIProvider {
   readonly providerName = 'openai';
 
@@ -23,7 +14,7 @@ export class OpenAIProvider implements AIProvider {
     }
 
     const candidateIds = new Set(input.candidates.map((candidate) => candidate.id));
-    const response = await fetch('https://api.openai.com/v1/responses', {
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${this.apiKey}`,
@@ -31,7 +22,7 @@ export class OpenAIProvider implements AIProvider {
       },
       body: JSON.stringify({
         model: this.model,
-        input: [
+        messages: [
           {
             role: 'system',
             content:
@@ -54,9 +45,9 @@ export class OpenAIProvider implements AIProvider {
             }),
           },
         ],
-        text: {
-          format: {
-            type: 'json_schema',
+        response_format: {
+          type: 'json_schema',
+          json_schema: {
             name: 'vamba_place_ranking',
             strict: true,
             schema: {
@@ -88,8 +79,8 @@ export class OpenAIProvider implements AIProvider {
       throw new Error(`OpenAI request failed with status ${response.status}`);
     }
 
-    const payload = (await response.json()) as OpenAIResponse;
-    const text = payload.output?.flatMap((item) => item.content ?? []).find((item) => item.text)?.text;
+    const payload = (await response.json()) as any;
+    const text = payload.choices?.[0]?.message?.content;
 
     if (!text) {
       throw new Error('OpenAI response did not include structured text output');

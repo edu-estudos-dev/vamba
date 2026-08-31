@@ -70,7 +70,7 @@ export class GooglePlacesProvider implements PlacesProvider {
         reviewCount: place.userRatingCount,
         priceLevel: this.normalizePriceLevel(place.priceLevel),
         isOpenNow: place.currentOpeningHours?.openNow,
-        source: 'google',
+        source: 'google' as const,
       },
     ];
   }

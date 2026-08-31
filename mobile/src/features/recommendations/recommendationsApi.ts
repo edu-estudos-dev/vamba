@@ -32,7 +32,8 @@ export const requestRecommendations = async (
   });
 
   if (!response.ok) {
-    throw new Error(`Recommendation request failed with status ${response.status}`);
+    const message = await response.text().catch(() => '');
+    throw new Error(`Recommendation failed (${response.status}): ${message || response.statusText}`);
   }
 
   return (await response.json()) as RecommendationResponse;
