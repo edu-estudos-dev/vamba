@@ -18,6 +18,14 @@ export const useFavorites = () => {
     setIsLoaded(true);
   }, []);
 
+  const remove = useCallback((placeId: string) => {
+    setFavorites((prev) => {
+      const updated = prev.filter((f) => f.id !== placeId);
+      localStorage.setItem(FAVORITES_KEY, JSON.stringify(updated));
+      return updated;
+    });
+  }, []);
+
   const save = useCallback(
     (item: RecommendationItem) => {
       setFavorites((prev) => {
@@ -33,17 +41,24 @@ export const useFavorites = () => {
         localStorage.setItem(FAVORITES_KEY, JSON.stringify(updated));
         return updated;
       });
+      return !favorites.some((f) => f.id === item.place.id);
     },
-    [],
+    [favorites],
   );
 
-  const remove = useCallback((placeId: string) => {
-    setFavorites((prev) => {
-      const updated = prev.filter((f) => f.id !== placeId);
-      localStorage.setItem(FAVORITES_KEY, JSON.stringify(updated));
-      return updated;
-    });
-  }, []);
+  const toggle = useCallback(
+    (item: RecommendationItem) => {
+      const isFav = favorites.some((f) => f.id === item.place.id);
+      if (isFav) {
+        remove(item.place.id);
+        return 'removed';
+      } else {
+        save(item);
+        return 'saved';
+      }
+    },
+    [favorites, save, remove],
+  );
 
   const isFavorited = useCallback((placeId: string) => {
     return favorites.some((f) => f.id === placeId);
@@ -55,5 +70,6 @@ export const useFavorites = () => {
     save,
     remove,
     isFavorited,
+    toggle,
   };
 };

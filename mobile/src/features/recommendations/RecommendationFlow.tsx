@@ -25,12 +25,12 @@ const demoLocation = {
 };
 
 type RecommendationFlowProps = {
-  onSaveFavorite?: (item: RecommendationItem) => void;
+  onToggleFavorite?: (item: RecommendationItem) => string;
   isFavorited?: (placeId: string) => boolean;
   onTrack?: (name: string, data?: Record<string, string | number>) => void;
 };
 
-export const RecommendationFlow = ({ onSaveFavorite, isFavorited, onTrack }: RecommendationFlowProps) => {
+export const RecommendationFlow = ({ onToggleFavorite, isFavorited, onTrack }: RecommendationFlowProps) => {
   const [category, setCategory] = useState<TravelCategory>('Conhecer');
   const [prompt, setPrompt] = useState('Tenho duas horas livres. O que vale a pena fazer agora?');
   const [statusMessage, setStatusMessage] = useState('Use sua localização ou teste com Lisboa.');
@@ -187,12 +187,11 @@ export const RecommendationFlow = ({ onSaveFavorite, isFavorited, onTrack }: Rec
             >
               <Text style={styles.routeButtonText}>Ir agora</Text>
             </Pressable>
-            {onSaveFavorite && (
+            {onToggleFavorite && (
               <Pressable
                 onPress={() => {
-                  const isFav = isFavorited?.(selectedItem.place.id);
-                  onSaveFavorite(selectedItem);
-                  onTrack?.(isFav ? 'favorite_removed' : 'favorite_saved', {
+                  const result = onToggleFavorite(selectedItem);
+                  onTrack?.(result === 'saved' ? 'favorite_saved' : 'favorite_removed', {
                     placeId: selectedItem.place.id,
                   });
                 }}

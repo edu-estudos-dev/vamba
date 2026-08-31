@@ -12,7 +12,7 @@ type Tab = 'recommendations' | 'favorites' | 'analytics';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<Tab>('recommendations');
-  const { favorites, isLoaded, save, remove, isFavorited } = useFavorites();
+  const { favorites, isLoaded, save, remove, isFavorited, toggle } = useFavorites();
   const { track, getEvents, clearEvents } = useAnalytics();
 
   return (
@@ -40,7 +40,7 @@ export default function App() {
         </View>
 
         {activeTab === 'recommendations' ? (
-          <RecommendationFlow onSaveFavorite={save} isFavorited={isFavorited} onTrack={track} />
+          <RecommendationFlow onToggleFavorite={toggle} isFavorited={isFavorited} onTrack={track} />
         ) : activeTab === 'favorites' ? (
           <FavoritesScreen favorites={favorites} onRemove={remove} onTrack={track} />
         ) : (
