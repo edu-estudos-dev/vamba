@@ -1,35 +1,28 @@
 import type { Request, Response } from 'express';
 
 import { createRecommendationService } from '../config/providers.js';
+import { AppError, toErrorResponse } from '../errors.js';
 import type { RecommendationRequest } from '../types/recommendation.js';
 
 export const createRecommendation = async (request: Request, response: Response) => {
   const body = request.body as Partial<RecommendationRequest>;
 
-  if (!body.location || !isNumber(body.location.latitude) || !isNumber(body.location.longitude)) {
-    response.status(400).json({
-      error: 'LOCATION_REQUIRED',
-      message: 'Latitude and longitude are required to request recommendations.',
-    });
-    return;
-  }
-
-  if ((process.env.NODE_ENV ?? 'development') === 'development') {
-    console.info('recommendations.location', {
-      latitude: body.location.latitude,
-      longitude: body.location.longitude,
-    });
-  }
-
-  if (!body.intent || (!body.intent.category && !body.intent.prompt)) {
-    response.status(400).json({
-      error: 'INTENT_REQUIRED',
-      message: 'Category or prompt is required to request recommendations.',
-    });
-    return;
-  }
-
   try {
+    if (!body.location || !isNumber(body.location.latitude) || !isNumber(body.location.longitude)) {
+      throw new AppError('LOCATION_REQUIRED', 'Latitude e longitude sao obrigatorias.');
+    }
+
+    if (!body.intent || (!body.intent.category && !body.intent.prompt)) {
+      throw new AppError('INTENT_REQUIRED', 'Categoria ou pedido em texto e obrigatorio.');
+    }
+
+    if ((process.env.NODE_ENV ?? 'development') === 'development') {
+      console.info('recommendations.location', {
+        latitude: body.location.latitude,
+        longitude: body.location.longitude,
+      });
+    }
+
     const recommendation = await createRecommendationService().recommend({
       location: body.location,
       intent: body.intent,
@@ -41,10 +34,8 @@ export const createRecommendation = async (request: Request, response: Response)
 
     response.status(200).json(recommendation);
   } catch (error) {
-    response.status(502).json({
-      error: 'RECOMMENDATION_FAILED',
-      message: error instanceof Error ? error.message : 'Recommendation failed',
-    });
+    const { status, body: errorBody } = toErrorResponse(error);
+    response.status(status).json(errorBody);
   }
 };
 

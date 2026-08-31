@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { Favorite } from './types';
 import type { RecommendationItem } from '../recommendations/types';
+import { loadJson, saveJson } from '../../lib/storage';
 
 const FAVORITES_KEY = 'vamba_favorites';
 
@@ -9,60 +10,61 @@ export const useFavorites = () => {
   const [isLoaded, setIsLoaded] = useState(false);
 
   useEffect(() => {
-    try {
-      const stored = localStorage.getItem(FAVORITES_KEY);
-      setFavorites(stored ? JSON.parse(stored) : []);
-    } catch {
-      setFavorites([]);
-    }
-    setIsLoaded(true);
+    let active = true;
+
+    loadJson<Favorite[]>(FAVORITES_KEY, []).then((stored) => {
+      if (!active) return;
+      setFavorites(stored);
+      setIsLoaded(true);
+    });
+
+    return () => {
+      active = false;
+    };
   }, []);
 
-  const remove = useCallback((placeId: string) => {
-    setFavorites((prev) => {
-      const updated = prev.filter((f) => f.id !== placeId);
-      localStorage.setItem(FAVORITES_KEY, JSON.stringify(updated));
-      return updated;
-    });
+  const persist = useCallback((updated: Favorite[]) => {
+    void saveJson(FAVORITES_KEY, updated);
+    return updated;
   }, []);
+
+  const remove = useCallback(
+    (placeId: string) => {
+      setFavorites((prev) => persist(prev.filter((favorite) => favorite.id !== placeId)));
+    },
+    [persist],
+  );
 
   const save = useCallback(
     (item: RecommendationItem) => {
       setFavorites((prev) => {
-        const exists = prev.some((f) => f.id === item.place.id);
-        if (exists) return prev;
+        if (prev.some((favorite) => favorite.id === item.place.id)) {
+          return prev;
+        }
 
-        const favorite: Favorite = {
-          ...item.place,
-          savedAt: new Date().toISOString(),
-        };
-
-        const updated = [...prev, favorite];
-        localStorage.setItem(FAVORITES_KEY, JSON.stringify(updated));
-        return updated;
+        return persist([...prev, { ...item.place, savedAt: new Date().toISOString() }]);
       });
-      return !favorites.some((f) => f.id === item.place.id);
     },
+    [persist],
+  );
+
+  const isFavorited = useCallback(
+    (placeId: string) => favorites.some((favorite) => favorite.id === placeId),
     [favorites],
   );
 
   const toggle = useCallback(
     (item: RecommendationItem) => {
-      const isFav = favorites.some((f) => f.id === item.place.id);
-      if (isFav) {
+      if (isFavorited(item.place.id)) {
         remove(item.place.id);
-        return 'removed';
-      } else {
-        save(item);
-        return 'saved';
+        return 'removed' as const;
       }
-    },
-    [favorites, save, remove],
-  );
 
-  const isFavorited = useCallback((placeId: string) => {
-    return favorites.some((f) => f.id === placeId);
-  }, [favorites]);
+      save(item);
+      return 'saved' as const;
+    },
+    [isFavorited, remove, save],
+  );
 
   return {
     favorites,

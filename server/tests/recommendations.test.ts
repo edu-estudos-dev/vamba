@@ -5,6 +5,7 @@ import { createApp } from '../src/app.js';
 import { RecommendationService } from '../src/services/RecommendationService.js';
 import type { AIProvider } from '../src/integrations/ai/AIProvider.js';
 import type { PlacesProvider } from '../src/integrations/places/PlacesProvider.js';
+import { CostGuard } from '../src/services/CostGuard.js';
 import { InMemoryApiUsageLogger } from '../src/services/ApiUsageLogger.js';
 
 const originalNodeEnv = process.env.NODE_ENV;
@@ -171,6 +172,7 @@ describe('RecommendationService', () => {
       placesProvider,
       aiProvider,
       usageLogger: new InMemoryApiUsageLogger(),
+      costGuard: new CostGuard(5),
     });
 
     await expect(

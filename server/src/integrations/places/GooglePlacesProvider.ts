@@ -46,7 +46,15 @@ export class GooglePlacesProvider implements PlacesProvider {
     });
 
     if (!response.ok) {
-      throw new Error(`Google Places request failed with status ${response.status}`);
+      const errorData = await response.text();
+
+      if (response.status === 403) {
+        throw new Error(
+          'Google Places recusou a chave (403). Verifique no projeto da GOOGLE_MAPS_API_KEY: conta de faturamento ativa, "Places API (New)" habilitada e presente nas restricoes de API da chave.',
+        );
+      }
+
+      throw new Error(`Google Places request failed with status ${response.status}: ${errorData}`);
     }
 
     const payload = (await response.json()) as { places?: GooglePlace[] };

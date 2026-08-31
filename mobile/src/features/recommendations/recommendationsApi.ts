@@ -1,4 +1,5 @@
 import { appConfig } from '../../config/app';
+import { apiRequest } from '../../lib/apiClient';
 import type { TravelCategory } from '../../types/travel';
 import type { RecommendationResponse } from './types';
 
@@ -9,15 +10,12 @@ type RequestRecommendationsInput = {
   prompt: string;
 };
 
-export const requestRecommendations = async (
+export const requestRecommendations = (
   input: RequestRecommendationsInput,
-): Promise<RecommendationResponse> => {
-  const response = await fetch(`${appConfig.apiBaseUrl}/recommendations`, {
+): Promise<RecommendationResponse> =>
+  apiRequest<RecommendationResponse>('/recommendations', {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
+    body: {
       location: {
         latitude: input.latitude,
         longitude: input.longitude,
@@ -28,13 +26,5 @@ export const requestRecommendations = async (
       },
       travelMode: 'walking',
       locale: appConfig.defaultLocale,
-    }),
+    },
   });
-
-  if (!response.ok) {
-    const message = await response.text().catch(() => '');
-    throw new Error(`Recommendation failed (${response.status}): ${message || response.statusText}`);
-  }
-
-  return (await response.json()) as RecommendationResponse;
-};

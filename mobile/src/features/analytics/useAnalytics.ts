@@ -1,4 +1,6 @@
-import { useCallback } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+
+import { loadJson, removeKey, saveJson } from '../../lib/storage';
 
 export type AnalyticsEvent = {
   name: string;
@@ -8,34 +10,39 @@ export type AnalyticsEvent = {
 
 const ANALYTICS_KEY = 'vamba_analytics';
 
+// ponytail: log local limitado aos eventos mais recentes; trocar por envio ao backend
+// quando analytics deixar de ser apenas inspecao manual na aba do app.
+const MAX_EVENTS = 500;
+
 export const useAnalytics = () => {
-  const track = useCallback((name: string, data?: Record<string, string | number>) => {
-    try {
-      const events = getEvents();
-      const event: AnalyticsEvent = {
-        name,
-        timestamp: new Date().toISOString(),
-        data,
-      };
-      events.push(event);
-      localStorage.setItem(ANALYTICS_KEY, JSON.stringify(events));
-    } catch {
-      // silently fail
-    }
+  const [events, setEvents] = useState<AnalyticsEvent[]>([]);
+
+  useEffect(() => {
+    let active = true;
+
+    loadJson<AnalyticsEvent[]>(ANALYTICS_KEY, []).then((stored) => {
+      if (active) setEvents(stored);
+    });
+
+    return () => {
+      active = false;
+    };
   }, []);
 
-  const getEvents = (): AnalyticsEvent[] => {
-    try {
-      const stored = localStorage.getItem(ANALYTICS_KEY);
-      return stored ? JSON.parse(stored) : [];
-    } catch {
-      return [];
-    }
-  };
+  const track = useCallback((name: string, data?: Record<string, string | number>) => {
+    setEvents((prev) => {
+      const updated = [...prev, { name, timestamp: new Date().toISOString(), data }].slice(
+        -MAX_EVENTS,
+      );
+      void saveJson(ANALYTICS_KEY, updated);
+      return updated;
+    });
+  }, []);
 
   const clearEvents = useCallback(() => {
-    localStorage.removeItem(ANALYTICS_KEY);
+    setEvents([]);
+    void removeKey(ANALYTICS_KEY);
   }, []);
 
-  return { track, getEvents, clearEvents };
+  return { events, track, clearEvents };
 };

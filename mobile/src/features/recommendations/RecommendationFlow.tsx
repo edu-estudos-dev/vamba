@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Linking,
@@ -11,6 +11,9 @@ import {
   View,
 } from 'react-native';
 
+import { fetchOffers, recordOfferClick } from '../affiliates/affiliatesApi';
+import type { AffiliateOffer } from '../affiliates/types';
+import { ApiError } from '../../lib/apiClient';
 import { requestCurrentLocation } from '../location/locationService';
 import type { TravelCategory } from '../../types/travel';
 import { buildExternalMapUrl } from './mapLinks';
@@ -37,6 +40,30 @@ export const RecommendationFlow = ({ onToggleFavorite, isFavorited, onTrack }: R
   const [isLoading, setIsLoading] = useState(false);
   const [recommendation, setRecommendation] = useState<RecommendationResponse | null>(null);
   const [selectedItem, setSelectedItem] = useState<RecommendationItem | null>(null);
+  const [offers, setOffers] = useState<AffiliateOffer[]>([]);
+
+  // Ofertas dependem do lugar aberto, entao so busca quando a selecao muda.
+  useEffect(() => {
+    if (!selectedItem) {
+      setOffers([]);
+      return;
+    }
+
+    let active = true;
+
+    fetchOffers({ placeId: selectedItem.place.id, category: selectedItem.place.category })
+      .then((nextOffers) => {
+        if (active) setOffers(nextOffers);
+      })
+      .catch(() => {
+        // Oferta e complemento: se falhar, a recomendacao continua util.
+        if (active) setOffers([]);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [selectedItem]);
 
   const requestWithGps = async () => {
     setIsLoading(true);
@@ -82,8 +109,11 @@ export const RecommendationFlow = ({ onToggleFavorite, isFavorited, onTrack }: R
       setSelectedItem(nextRecommendation.primaryRecommendation);
       setStatusMessage(successMessage);
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Erro desconhecido';
-      setStatusMessage(`Erro: ${message}`);
+      setRecommendation(null);
+      setSelectedItem(null);
+      setStatusMessage(
+        error instanceof ApiError ? error.message : 'Algo deu errado. Tente de novo em instantes.',
+      );
     } finally {
       setIsLoading(false);
     }
@@ -204,9 +234,41 @@ export const RecommendationFlow = ({ onToggleFavorite, isFavorited, onTrack }: R
         </View>
       ) : null}
 
+      {selectedItem && offers.length > 0 ? (
+        <View style={styles.offers}>
+          <Text style={styles.sectionTitle}>Enquanto você está aqui</Text>
+          {offers.map((offer) => (
+            <Pressable
+              key={offer.id}
+              onPress={() => {
+                onTrack?.('offer_clicked', { offerId: offer.id, placeId: selectedItem.place.id });
+                // Registro do clique e best-effort: falhar aqui nao pode impedir
+                // o usuario de abrir a oferta, nem virar unhandled rejection.
+                recordOfferClick({ offerId: offer.id, placeId: selectedItem.place.id }).catch(
+                  () => undefined,
+                );
+                void Linking.openURL(offer.trackedUrl);
+              }}
+              style={styles.offer}
+            >
+              <Text style={styles.offerTitle}>{offer.title}</Text>
+              {offer.description ? <Text style={styles.offerDescription}>{offer.description}</Text> : null}
+              <Text style={styles.offerMeta}>
+                {offer.partner}
+                {offer.priceFrom ? ` • a partir de ${offer.priceFrom}` : ''}
+              </Text>
+              {offer.isMock ? (
+                <Text style={styles.offerMock}>Oferta de exemplo: ainda não há parceria real por trás.</Text>
+              ) : null}
+            </Pressable>
+          ))}
+        </View>
+      ) : null}
+
       {recommendation ? (
         <Text style={styles.costNote}>
-          Chamadas registradas: {recommendation.usageEvents.map((event) => event.provider).join(', ')}.
+          Providers usados: {recommendation.usageEvents.map((event) => event.provider).join(', ')}. Custo
+          estimado hoje: USD {recommendation.cost.spentUsd.toFixed(4)} de {recommendation.cost.limitUsd.toFixed(2)}.
         </Text>
       ) : null}
     </ScrollView>
@@ -414,6 +476,34 @@ const styles = StyleSheet.create({
   },
   favoriteButtonText: {
     fontSize: 20,
+  },
+  offers: {
+    gap: 10,
+  },
+  offer: {
+    backgroundColor: '#fffaf0',
+    borderColor: '#e6d3a3',
+    borderRadius: 8,
+    borderWidth: 1,
+    gap: 5,
+    padding: 14,
+  },
+  offerTitle: {
+    color: '#143c33',
+    fontSize: 16,
+    fontWeight: '800',
+  },
+  offerDescription: {
+    color: '#35534c',
+    lineHeight: 20,
+  },
+  offerMeta: {
+    color: '#60766f',
+    fontSize: 13,
+  },
+  offerMock: {
+    color: '#8a6d1f',
+    fontSize: 12,
   },
   costNote: {
     color: '#60766f',

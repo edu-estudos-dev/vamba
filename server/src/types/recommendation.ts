@@ -1,4 +1,5 @@
 import type { PlaceCandidate } from '../integrations/places/PlacesProvider.js';
+import type { CostSnapshot } from '../services/CostGuard.js';
 
 export type Coordinates = {
   latitude: number;
@@ -33,6 +34,7 @@ export type RecommendationResponse = {
   primaryRecommendation: RecommendationItem;
   recommendations: RecommendationItem[];
   usageEvents: ApiUsageEvent[];
+  cost: CostSnapshot;
 };
 
 export type ApiUsageEvent = {

@@ -26,6 +26,12 @@ export type RecommendationResponse = {
   generatedAt: string;
   primaryRecommendation: RecommendationItem;
   recommendations: RecommendationItem[];
+  cost: {
+    day: string;
+    spentUsd: number;
+    limitUsd: number;
+    remainingUsd: number;
+  };
   usageEvents: Array<{
     provider: string;
     operation: string;

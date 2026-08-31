@@ -1,3 +1,5 @@
+import { estimateCost } from '../config/pricing.js';
+import { AppError } from '../errors.js';
 import type { AIProvider } from '../integrations/ai/AIProvider.js';
 import type { PlaceCandidate, PlacesProvider } from '../integrations/places/PlacesProvider.js';
 import type {
@@ -6,26 +8,31 @@ import type {
   RecommendationResponse,
 } from '../types/recommendation.js';
 import type { ApiUsageLogger } from './ApiUsageLogger.js';
+import type { CostGuard } from './CostGuard.js';
 
 type RecommendationServiceDependencies = {
   placesProvider: PlacesProvider;
   aiProvider: AIProvider;
   usageLogger: ApiUsageLogger;
+  costGuard: CostGuard;
 };
 
 export class RecommendationService {
   private placesProvider: PlacesProvider;
   private aiProvider: AIProvider;
   private usageLogger: ApiUsageLogger;
+  private costGuard: CostGuard;
 
   constructor(dependencies: RecommendationServiceDependencies) {
     this.placesProvider = dependencies.placesProvider;
     this.aiProvider = dependencies.aiProvider;
     this.usageLogger = dependencies.usageLogger;
+    this.costGuard = dependencies.costGuard;
   }
 
   async recommend(request: RecommendationRequest): Promise<RecommendationResponse> {
     this.usageLogger.clear();
+    this.costGuard.assertWithinBudget();
 
     const candidates = await this.placesProvider.search({
       latitude: request.location.latitude,
@@ -36,16 +43,18 @@ export class RecommendationService {
       radiusMeters: 2_000,
     });
 
-    this.usageLogger.record({
+    this.recordUsage({
       provider: this.placesProvider.providerName ?? 'places',
       operation: 'search',
       inputUnits: 1,
       outputUnits: candidates.length,
-      estimatedCost: 0,
     });
 
     if (candidates.length === 0) {
-      throw new Error('PlacesProvider returned no candidates');
+      throw new AppError(
+        'NO_CANDIDATES',
+        'Nenhum lugar encontrado por perto para esse pedido.',
+      );
     }
 
     const rankings = await this.aiProvider.rankPlaces({
@@ -53,19 +62,18 @@ export class RecommendationService {
       candidates,
     });
 
-    this.usageLogger.record({
+    this.recordUsage({
       provider: this.aiProvider.providerName ?? 'ai',
       operation: 'rankPlaces',
       inputUnits: candidates.length,
       outputUnits: rankings.length,
-      estimatedCost: 0,
     });
 
     const recommendations = this.mergeRankings(candidates, rankings);
     const primaryRecommendation = recommendations[0];
 
     if (!primaryRecommendation) {
-      throw new Error('AIProvider returned no usable recommendations');
+      throw new AppError('NO_CANDIDATES', 'Nao foi possivel montar uma recomendacao com os lugares encontrados.');
     }
 
     return {
@@ -74,7 +82,21 @@ export class RecommendationService {
       primaryRecommendation,
       recommendations,
       usageEvents: this.usageLogger.getEvents(),
+      cost: this.costGuard.snapshot(),
     };
+  }
+
+  /** Registra o evento e soma o custo estimado no teto diario. */
+  private recordUsage(input: {
+    provider: string;
+    operation: string;
+    inputUnits: number;
+    outputUnits: number;
+  }): void {
+    const cost = estimateCost(input.provider, input.operation);
+
+    this.usageLogger.record({ ...input, estimatedCost: cost });
+    this.costGuard.record(cost);
   }
 
   private buildPrompt(request: RecommendationRequest): string {
@@ -102,11 +124,17 @@ export class RecommendationService {
         const place = candidatesById.get(ranking.placeId);
 
         if (!place) {
-          throw new Error(`AIProvider returned an unknown place id: ${ranking.placeId}`);
+          throw new AppError(
+            'PROVIDER_FAILED',
+            `AIProvider returned an unknown place id: ${ranking.placeId}`,
+          );
         }
 
         if (seenPlaceIds.has(ranking.placeId)) {
-          throw new Error(`AIProvider returned a duplicate place id: ${ranking.placeId}`);
+          throw new AppError(
+            'PROVIDER_FAILED',
+            `AIProvider returned a duplicate place id: ${ranking.placeId}`,
+          );
         }
 
         seenPlaceIds.add(ranking.placeId);
