@@ -12,12 +12,23 @@ import { CostGuard } from '../services/CostGuard.js';
 import { RecommendationService } from '../services/RecommendationService.js';
 import { TranslationService } from '../services/TranslationService.js';
 import { env } from './env.js';
+import { hasKnownOpenAiPricing } from './pricing.js';
 
 /**
  * O teto de custo precisa somar entre requests, entao o guard e criado uma vez
  * por processo, diferente dos services, que sao montados por request.
  */
 const costGuard = new CostGuard(env.dailyCostLimitUsd);
+
+// Falha no boot, nao na primeira recomendacao: um modelo sem preco conhecido em
+// pricing.ts faria o custo virar zero silenciosamente e o CostGuard nunca barrar
+// gasto real com esse modelo.
+if (env.aiProvider === 'openai' && !hasKnownOpenAiPricing(env.openaiModel)) {
+  throw new Error(
+    `OPENAI_MODEL "${env.openaiModel}" nao tem preco conhecido em server/src/config/pricing.ts. ` +
+      'Adicione o preco por 1M tokens desse modelo antes de ativar AI_PROVIDER=openai.',
+  );
+}
 
 const affiliateProvider: AffiliateProvider = new FakeAffiliateProvider();
 

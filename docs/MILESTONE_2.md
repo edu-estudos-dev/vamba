@@ -15,7 +15,14 @@ mesmo efeito de concluir, porque prender o usuário na introdução não ajuda n
 
 Cinco categorias no `RecommendationFlow`: Comer, Conhecer, Passear, Compras e
 Surpreenda-me. A categoria escolhida vai no `intent` do pedido e chega ao
-`PlacesProvider` como filtro de busca.
+`PlacesProvider` como filtro de busca: `GooglePlacesProvider` mapeia cada uma
+para `includedTypes` do Nearby Search (New). "Surpreenda-me" fica sem filtro,
+de propósito.
+
+Toda chamada a provider externo (`GooglePlacesProvider`, `OpenAIProvider`,
+`GoogleTranslationProvider`) usa `AbortSignal.timeout(8000)`. Sem isso, um
+provider que só demora prendia o request e o app com o spinner travado por
+minutos, com a busca de lugares já paga.
 
 ## Favoritos
 
@@ -51,14 +58,22 @@ Duas peças:
 
 - `server/src/config/pricing.ts` — preço estimado por operação de cada provider pago.
   Providers fake custam zero. Provider ou operação sem preço conhecido devolve zero,
-  porque um número inventado seria pior que a ausência de estimativa.
+  porque um número inventado seria pior que a ausência de estimativa. Exceção: o preço
+  da OpenAI é indexado por `OPENAI_MODEL`, e o servidor recusa subir (`config/providers.ts`)
+  se o modelo configurado não tiver preço cadastrado — um custo desconhecido não pode
+  virar zero silenciosamente nesse caso, porque o teto pararia de proteger de verdade.
 - `server/src/services/CostGuard.ts` — soma o gasto do dia e recusa novas chamadas
-  pagas com `429 COST_LIMIT_REACHED` quando `DAILY_COST_LIMIT_USD` (padrão 5) é atingido.
-  O guard existe uma vez por processo; os services são montados por request.
+  pagas com `429 COST_LIMIT_REACHED` quando `DAILY_COST_LIMIT_USD` (padrão 3) é atingido.
+  O guard existe uma vez por processo; os services são montados por request. A checagem
+  e a soma do custo acontecem no mesmo método síncrono (`reserve`), antes do `await` da
+  chamada paga — em dois passos separados, duas chamadas concorrentes podiam ler o
+  mesmo saldo e passar juntas, furando o teto sem limite superior.
 
 O padrão é **US$3/dia** porque o crédito de trial do Google Cloud é de US$300 por
 90 dias: 300 ÷ 90 = 3,33. Com um teto maior, o pior caso queima o crédito antes do
-fim da janela de validação. Revisar quando a conta sair do trial.
+fim da janela de validação. Revisar quando a conta sair do trial. O dia vira no fuso
+do billing do Google Cloud (`America/Los_Angeles`), não em UTC nem no fuso local do
+usuário — senão o contador pode zerar horas antes da virada real de faturamento.
 
 O consumo do dia aparece em `GET /health` e na resposta de `POST /recommendations`.
 

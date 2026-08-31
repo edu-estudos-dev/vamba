@@ -127,7 +127,14 @@ export const RecommendationFlow = ({ onToggleFavorite, isFavorited, onTrack }: R
       label: item.place.name,
     });
 
-    await Linking.openURL(url);
+    try {
+      await Linking.openURL(url);
+      onTrack?.('map_opened', { placeId: item.place.id });
+    } catch {
+      // Sem app de mapa instalado ou esquema nao registrado: dizer isso em vez
+      // de deixar o toque em "Ir agora" nao fazer nada visivel.
+      setStatusMessage('Não foi possível abrir o mapa neste aparelho.');
+    }
   };
 
   return (
@@ -153,6 +160,10 @@ export const RecommendationFlow = ({ onToggleFavorite, isFavorited, onTrack }: R
 
         <TextInput
           multiline
+          // Espelha o padrao de RECOMMENDATION_PROMPT_MAX_CHARS no backend: sem
+          // isso, o usuario so descobre o limite depois de enviar, com uma
+          // mensagem generica que nao explica que o texto ficou grande demais.
+          maxLength={500}
           onChangeText={setPrompt}
           style={styles.input}
           value={prompt}
@@ -210,8 +221,7 @@ export const RecommendationFlow = ({ onToggleFavorite, isFavorited, onTrack }: R
           <View style={styles.detailActions}>
             <Pressable
               onPress={() => {
-                openRoute(selectedItem);
-                onTrack?.('map_opened', { placeId: selectedItem.place.id });
+                void openRoute(selectedItem);
               }}
               style={styles.routeButton}
             >
@@ -247,7 +257,7 @@ export const RecommendationFlow = ({ onToggleFavorite, isFavorited, onTrack }: R
                 recordOfferClick({ offerId: offer.id, placeId: selectedItem.place.id }).catch(
                   () => undefined,
                 );
-                void Linking.openURL(offer.trackedUrl);
+                Linking.openURL(offer.trackedUrl).catch(() => undefined);
               }}
               style={styles.offer}
             >

@@ -46,4 +46,13 @@ export const env = {
   openaiModel: process.env.OPENAI_MODEL ?? 'gpt-4o-mini',
   dailyCostLimitUsd: readPositiveNumber(process.env.DAILY_COST_LIMIT_USD, 3, 'DAILY_COST_LIMIT_USD'),
   translationMaxChars: readPositiveNumber(process.env.TRANSLATION_MAX_CHARS, 500, 'TRANSLATION_MAX_CHARS'),
+  // `pricing.ts` estima o custo do rankPlaces com um numero fixo de tokens de
+  // entrada. Sem um teto de tamanho, um prompt de dezenas de milhares de
+  // caracteres (o body aceita ate 64kb) faz o custo real da OpenAI passar
+  // muito longe do que o CostGuard reservou para aquela chamada.
+  recommendationPromptMaxChars: readPositiveNumber(
+    process.env.RECOMMENDATION_PROMPT_MAX_CHARS,
+    500,
+    'RECOMMENDATION_PROMPT_MAX_CHARS',
+  ),
 };

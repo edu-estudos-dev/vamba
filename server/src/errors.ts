@@ -5,7 +5,10 @@ export type AppErrorCode =
   | 'OFFER_REQUIRED'
   | 'NO_CANDIDATES'
   | 'COST_LIMIT_REACHED'
-  | 'PROVIDER_FAILED';
+  | 'PROVIDER_FAILED'
+  | 'INVALID_REQUEST_BODY'
+  | 'NOT_FOUND'
+  | 'INTERNAL_ERROR';
 
 const statusByCode: Record<AppErrorCode, number> = {
   LOCATION_REQUIRED: 400,
@@ -15,6 +18,9 @@ const statusByCode: Record<AppErrorCode, number> = {
   NO_CANDIDATES: 404,
   COST_LIMIT_REACHED: 429,
   PROVIDER_FAILED: 502,
+  INVALID_REQUEST_BODY: 400,
+  NOT_FOUND: 404,
+  INTERNAL_ERROR: 500,
 };
 
 /**

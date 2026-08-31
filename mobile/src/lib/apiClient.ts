@@ -9,6 +9,9 @@ export type ApiErrorCode =
   | 'NO_CANDIDATES'
   | 'COST_LIMIT_REACHED'
   | 'PROVIDER_FAILED'
+  | 'INVALID_REQUEST_BODY'
+  | 'NOT_FOUND'
+  | 'INTERNAL_ERROR'
   | 'NETWORK_UNAVAILABLE';
 
 /**
@@ -23,6 +26,9 @@ const messageByCode: Record<ApiErrorCode, string> = {
   NO_CANDIDATES: 'Não encontramos nada por perto agora. Tente outra categoria ou amplie a busca.',
   COST_LIMIT_REACHED: 'O limite de uso diário do Vamba foi atingido. Tente de novo amanhã.',
   PROVIDER_FAILED: 'Um serviço externo falhou. Tente de novo em instantes.',
+  INVALID_REQUEST_BODY: 'Algo deu errado ao enviar seu pedido. Tente de novo.',
+  NOT_FOUND: 'Não encontramos o que você pediu.',
+  INTERNAL_ERROR: 'Algo deu errado no servidor do Vamba. Tente de novo em instantes.',
   NETWORK_UNAVAILABLE: 'Sem conexão com o servidor do Vamba. Verifique sua internet.',
 };
 
@@ -50,6 +56,9 @@ export const apiRequest = async <T>(
       method: init?.method ?? 'GET',
       headers: init?.body ? { 'Content-Type': 'application/json' } : undefined,
       body: init?.body ? JSON.stringify(init.body) : undefined,
+      // Sem teto de tempo, um backend travado prende o app com o spinner
+      // preso indefinidamente. AbortError cai no mesmo catch de rede abaixo.
+      signal: AbortSignal.timeout(15_000),
     });
   } catch (error) {
     throw new ApiError('NETWORK_UNAVAILABLE', error instanceof Error ? error.message : undefined);

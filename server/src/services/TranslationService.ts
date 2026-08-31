@@ -55,19 +55,20 @@ export class TranslationService {
       );
     }
 
-    this.costGuard.assertWithinBudget();
-
     const sourceLanguage = request.sourceLanguage ?? 'pt';
     const provider = this.translationProvider.providerName ?? 'translation';
+    const cost = estimateCost(provider, 'translate', text.length);
+
+    // Reserva antes do await pelo mesmo motivo do RecommendationService: sem
+    // isso, duas traducoes concorrentes podem passar juntas pelo teto, e uma
+    // traducao que o provider cobrou mas devolveu erro nao entraria na conta.
+    this.costGuard.reserve(cost);
 
     const result = await this.translationProvider.translate({
       text,
       sourceLanguage,
       targetLanguage: request.targetLanguage,
     });
-
-    const cost = estimateCost(provider, 'translate', text.length);
-    this.costGuard.record(cost);
 
     return {
       translatedText: result.translatedText,

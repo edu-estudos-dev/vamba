@@ -56,8 +56,12 @@ Variáveis:
 ```env
 AI_PROVIDER=openai
 OPENAI_API_KEY=
-OPENAI_MODEL=gpt-5-mini
+OPENAI_MODEL=gpt-4o-mini
 ```
+
+`OPENAI_MODEL` precisa ter preço cadastrado em `server/src/config/pricing.ts`
+(`hasKnownOpenAiPricing`) — o servidor recusa subir com um modelo sem preço
+conhecido, para o `CostGuard` não subestimar o gasto real.
 
 Entrada estruturada enviada à IA:
 
@@ -99,7 +103,7 @@ Com providers fake:
 Com providers reais previstos:
 
 - 1 chamada Google Places Nearby Search.
-- 1 chamada OpenAI Responses API.
+- 1 chamada OpenAI Chat Completions API (com `response_format: json_schema`).
 - 0 chamadas de rota própria; o app abre mapa externo.
 
 Futuro opcional:

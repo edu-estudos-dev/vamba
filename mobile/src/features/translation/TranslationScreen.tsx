@@ -80,6 +80,9 @@ export const TranslationScreen = ({ onTrack }: TranslationScreenProps) => {
 
         <TextInput
           multiline
+          // Espelha o padrao de TRANSLATION_MAX_CHARS no backend: sem isso, o
+          // usuario so descobre o limite depois de enviar.
+          maxLength={500}
           onChangeText={setText}
           placeholder="Escreva em português..."
           placeholderTextColor="#6f817b"

@@ -1,4 +1,4 @@
-import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, Linking, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { buildExternalMapUrl } from '../recommendations/mapLinks';
 import type { Favorite } from './types';
 
@@ -9,15 +9,23 @@ type FavoritesScreenProps = {
 };
 
 export const FavoritesScreen = ({ favorites, onRemove, onTrack }: FavoritesScreenProps) => {
-  const handleOpenMap = (place: Favorite) => {
+  const handleOpenMap = async (place: Favorite) => {
     const url = buildExternalMapUrl({
-      platform: 'android',
+      // Antes fixo em 'android': no iOS nunca abria o Apple Maps nativo.
+      platform: Platform.OS,
       latitude: place.latitude,
       longitude: place.longitude,
       label: place.name,
     });
-    onTrack?.('map_opened', { placeId: place.id, source: 'favorites' });
-    Linking.openURL(url);
+
+    try {
+      await Linking.openURL(url);
+      onTrack?.('map_opened', { placeId: place.id, source: 'favorites' });
+    } catch {
+      // Sem app de mapa instalado ou esquema nao registrado: avisar em vez de
+      // o toque em "Ir agora" nao fazer nada visivel.
+      Alert.alert('Não foi possível abrir o mapa neste aparelho.');
+    }
   };
 
   const handleRemove = (placeId: string) => {
@@ -47,7 +55,7 @@ export const FavoritesScreen = ({ favorites, onRemove, onTrack }: FavoritesScree
             <Text style={styles.rating}>⭐ {place.rating} ({place.reviewCount} reviews)</Text>
           )}
           <View style={styles.actions}>
-            <Pressable style={styles.mapButton} onPress={() => handleOpenMap(place)}>
+            <Pressable style={styles.mapButton} onPress={() => void handleOpenMap(place)}>
               <Text style={styles.mapButtonText}>Ir agora</Text>
             </Pressable>
             <Pressable style={styles.removeButton} onPress={() => handleRemove(place.id)}>

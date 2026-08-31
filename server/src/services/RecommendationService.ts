@@ -32,7 +32,12 @@ export class RecommendationService {
 
   async recommend(request: RecommendationRequest): Promise<RecommendationResponse> {
     this.usageLogger.clear();
-    this.costGuard.assertWithinBudget();
+
+    const placesProviderName = this.placesProvider.providerName ?? 'places';
+    const placesCost = estimateCost(placesProviderName, 'search');
+    // Reserva antes do await: se a busca falhar depois de o provider ja ter
+    // cobrado, o gasto ainda entra na conta.
+    this.costGuard.reserve(placesCost);
 
     const candidates = await this.placesProvider.search({
       latitude: request.location.latitude,
@@ -43,11 +48,12 @@ export class RecommendationService {
       radiusMeters: 2_000,
     });
 
-    this.recordUsage({
-      provider: this.placesProvider.providerName ?? 'places',
+    this.usageLogger.record({
+      provider: placesProviderName,
       operation: 'search',
       inputUnits: 1,
       outputUnits: candidates.length,
+      estimatedCost: placesCost,
     });
 
     if (candidates.length === 0) {
@@ -57,20 +63,22 @@ export class RecommendationService {
       );
     }
 
-    // A busca de lugares ja cobrou. Sem checar de novo, uma chamada de IA sai
-    // por cima de um teto que ja estourou.
-    this.costGuard.assertWithinBudget();
+    const aiProviderName = this.aiProvider.providerName ?? 'ai';
+    const rankCost = estimateCost(aiProviderName, 'rankPlaces');
+    // Mesma logica: reserva antes do await da IA, nao depois.
+    this.costGuard.reserve(rankCost);
 
     const rankings = await this.aiProvider.rankPlaces({
       prompt: this.buildPrompt(request),
       candidates,
     });
 
-    this.recordUsage({
-      provider: this.aiProvider.providerName ?? 'ai',
+    this.usageLogger.record({
+      provider: aiProviderName,
       operation: 'rankPlaces',
       inputUnits: candidates.length,
       outputUnits: rankings.length,
+      estimatedCost: rankCost,
     });
 
     const recommendations = this.mergeRankings(candidates, rankings);
@@ -88,19 +96,6 @@ export class RecommendationService {
       usageEvents: this.usageLogger.getEvents(),
       cost: this.costGuard.snapshot(),
     };
-  }
-
-  /** Registra o evento e soma o custo estimado no teto diario. */
-  private recordUsage(input: {
-    provider: string;
-    operation: string;
-    inputUnits: number;
-    outputUnits: number;
-  }): void {
-    const cost = estimateCost(input.provider, input.operation);
-
-    this.usageLogger.record({ ...input, estimatedCost: cost });
-    this.costGuard.record(cost);
   }
 
   private buildPrompt(request: RecommendationRequest): string {
@@ -129,12 +124,13 @@ export class RecommendationService {
       .sort((left, right) => left.rank - right.rank)
       .flatMap((ranking) => {
         const place = candidatesById.get(ranking.placeId);
+        const hasExplanation = ranking.explanation?.trim().length >= 10;
 
-        if (!place || seenPlaceIds.has(ranking.placeId)) {
+        if (!place || seenPlaceIds.has(ranking.placeId) || !hasExplanation) {
           console.warn('ai.invalid_ranking', {
             provider: this.aiProvider.providerName,
             placeId: ranking.placeId,
-            reason: place ? 'duplicate' : 'unknown',
+            reason: !place ? 'unknown' : !hasExplanation ? 'empty_explanation' : 'duplicate',
           });
 
           return [];

@@ -30,6 +30,7 @@ export class GoogleTranslationProvider implements TranslationProvider {
 
     const response = await fetch('https://translation.googleapis.com/language/translate/v2', {
       method: 'POST',
+      signal: AbortSignal.timeout(8_000),
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         q: input.text,

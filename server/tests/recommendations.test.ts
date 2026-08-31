@@ -7,6 +7,7 @@ import type { AIProvider } from '../src/integrations/ai/AIProvider.js';
 import type { PlacesProvider } from '../src/integrations/places/PlacesProvider.js';
 import { CostGuard } from '../src/services/CostGuard.js';
 import { InMemoryApiUsageLogger } from '../src/services/ApiUsageLogger.js';
+import { estimateCost } from '../src/config/pricing.js';
 
 const originalNodeEnv = process.env.NODE_ENV;
 
@@ -100,6 +101,30 @@ describe('POST /recommendations', () => {
 
     expect(response.status).toBe(400);
     expect(response.body.error).toBe('INTENT_REQUIRED');
+  });
+
+  it('recusa prompt gigante antes de gastar com a IA', async () => {
+    const response = await request(createApp())
+      .post('/recommendations')
+      .send({
+        location: { latitude: 38.7223, longitude: -9.1393 },
+        intent: { prompt: 'a'.repeat(5_000) },
+      });
+
+    expect(response.status).toBe(400);
+    expect(response.body.error).toBe('INTENT_REQUIRED');
+  });
+
+  it('rejeita coordenadas fora da faixa valida', async () => {
+    const response = await request(createApp())
+      .post('/recommendations')
+      .send({
+        location: { latitude: 300, longitude: -9.1393 },
+        intent: { category: 'Conhecer' },
+      });
+
+    expect(response.status).toBe(400);
+    expect(response.body.error).toBe('LOCATION_REQUIRED');
   });
 
   it('respects locale param', async () => {
@@ -219,10 +244,10 @@ describe('RecommendationService', () => {
     const aiProvider: AIProvider = {
       async rankPlaces() {
         return [
-          { placeId: 'invented-place', rank: 1, explanation: 'Alucinacao.' },
-          { placeId: 'real-b', rank: 2, explanation: 'Valido.' },
-          { placeId: 'real-a', rank: 3, explanation: 'Valido.' },
-          { placeId: 'real-b', rank: 4, explanation: 'Duplicado.' },
+          { placeId: 'invented-place', rank: 1, explanation: 'Alucinacao do modelo.' },
+          { placeId: 'real-b', rank: 2, explanation: 'Candidato valido retornado pelo places.' },
+          { placeId: 'real-a', rank: 3, explanation: 'Outro candidato valido retornado.' },
+          { placeId: 'real-b', rank: 4, explanation: 'Repeticao que deve ser descartada.' },
         ];
       },
     };
@@ -286,5 +311,149 @@ describe('RecommendationService', () => {
     ).rejects.toThrow('Limite diario de custo');
 
     expect(rankPlaces).not.toHaveBeenCalled();
+  });
+
+  it('descarta ranking com explicacao vazia ou curta demais', async () => {
+    const placesProvider: PlacesProvider = {
+      async search() {
+        return [
+          {
+            id: 'real-a',
+            name: 'Real A',
+            category: 'museum',
+            latitude: 38.72,
+            longitude: -9.13,
+            distanceMeters: 300,
+            rating: 4.7,
+            reviewCount: 100,
+            isOpenNow: true,
+          },
+        ];
+      },
+    };
+
+    // Explicacao e o que o usuario le na tela: uma vazia ou irrisoriamente
+    // curta e tao invalida quanto um id inventado.
+    const aiProvider: AIProvider = {
+      async rankPlaces() {
+        return [{ placeId: 'real-a', rank: 1, explanation: '' }];
+      },
+    };
+
+    const service = new RecommendationService({
+      placesProvider,
+      aiProvider,
+      usageLogger: new InMemoryApiUsageLogger(),
+      costGuard: new CostGuard(5),
+    });
+
+    await expect(
+      service.recommend({
+        location: { latitude: 38.72, longitude: -9.13 },
+        intent: { category: 'Conhecer' },
+        travelMode: 'walking',
+      }),
+    ).rejects.toThrow('Nao foi possivel montar uma recomendacao');
+  });
+
+  it('cobra o custo mesmo quando a chamada da IA falha depois do request pago', async () => {
+    const placesProvider: PlacesProvider = {
+      providerName: 'google-places',
+      async search() {
+        return [
+          {
+            id: 'real-a',
+            name: 'Real A',
+            category: 'museum',
+            latitude: 38.72,
+            longitude: -9.13,
+            distanceMeters: 300,
+            rating: 4.7,
+            reviewCount: 100,
+            isOpenNow: true,
+          },
+        ];
+      },
+    };
+
+    // Simula OpenAI cobrando os tokens e so depois devolvendo erro (JSON
+    // malformado, 500 apos gerar a resposta, etc.).
+    const aiProvider: AIProvider = {
+      providerName: 'openai:gpt-4o-mini',
+      async rankPlaces() {
+        throw new Error('OpenAI request failed with status 500');
+      },
+    };
+
+    const costGuard = new CostGuard(5);
+    const service = new RecommendationService({
+      placesProvider,
+      aiProvider,
+      usageLogger: new InMemoryApiUsageLogger(),
+      costGuard,
+    });
+
+    await expect(
+      service.recommend({
+        location: { latitude: 38.72, longitude: -9.13 },
+        intent: { category: 'Conhecer' },
+        travelMode: 'walking',
+      }),
+    ).rejects.toThrow('OpenAI request failed');
+
+    expect(costGuard.snapshot().spentUsd).toBeGreaterThan(0);
+  });
+
+  it('segura o teto sob recomendacoes concorrentes com o mesmo CostGuard', async () => {
+    const placesProvider: PlacesProvider = {
+      providerName: 'google-places',
+      async search() {
+        await new Promise((resolve) => setTimeout(resolve, 5));
+        return [
+          {
+            id: 'real-a',
+            name: 'Real A',
+            category: 'museum',
+            latitude: 38.72,
+            longitude: -9.13,
+            isOpenNow: true,
+          },
+        ];
+      },
+    };
+
+    const aiProvider: AIProvider = {
+      providerName: 'fake-ai',
+      async rankPlaces(input) {
+        return input.candidates.map((candidate, index) => ({
+          placeId: candidate.id,
+          rank: index + 1,
+          explanation: 'Explicacao valida o suficiente para passar na regra.',
+        }));
+      },
+    };
+
+    const costGuard = new CostGuard(3);
+    const service = new RecommendationService({
+      placesProvider,
+      aiProvider,
+      usageLogger: new InMemoryApiUsageLogger(),
+      costGuard,
+    });
+
+    const request = {
+      location: { latitude: 38.72, longitude: -9.13 },
+      intent: { category: 'Conhecer' },
+      travelMode: 'walking' as const,
+    };
+
+    // 200 recomendacoes concorrentes; cada uma cria seu proprio usageLogger
+    // (config/providers.ts monta o service por request), mas todas compartilham
+    // o mesmo CostGuard, como acontece de verdade no processo do servidor.
+    await Promise.all(
+      Array.from({ length: 200 }, () => service.recommend(request).catch(() => undefined)),
+    );
+
+    expect(costGuard.snapshot().spentUsd).toBeLessThanOrEqual(3 + estimateCost('google-places', 'search') + 1e-6);
   });
 });

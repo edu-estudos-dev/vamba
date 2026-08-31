@@ -1,6 +1,6 @@
 # API
 
-Base inicial do backend. Endpoints reais serão adicionados por milestone.
+Base do backend. Endpoints implementados até a Milestone 2.
 
 ## Health
 
@@ -11,15 +11,21 @@ Resposta:
 ```json
 {
   "status": "ok",
-  "service": "vamba-server"
+  "service": "vamba-server",
+  "cost": {
+    "day": "2026-08-31",
+    "spentUsd": 0,
+    "limitUsd": 3,
+    "remainingUsd": 3
+  }
 }
 ```
 
-## Recommendation - futuro
+## Recommendation
 
 `POST /recommendations`
 
-Implementado na Milestone 1 com providers fake por padrão.
+Implementado na Milestone 1, com providers fake por padrão.
 
 Request:
 
@@ -54,20 +60,105 @@ Response:
     "explanation": "Recomendo ir agora porque está próximo..."
   },
   "recommendations": [],
-  "usageEvents": []
+  "usageEvents": [],
+  "cost": {
+    "day": "2026-08-31",
+    "spentUsd": 0,
+    "limitUsd": 3,
+    "remainingUsd": 3
+  }
 }
 ```
 
-A IA só pode ranquear candidatos retornados por `PlacesProvider`. O backend rejeita qualquer `placeId` desconhecido retornado por `AIProvider`.
+A IA só pode ranquear candidatos retornados por `PlacesProvider`. O backend rejeita
+qualquer `placeId` desconhecido ou repetido retornado por `AIProvider`, e também
+descarta rankings com `explanation` vazia ou curta demais. Um item descartado não
+derruba a recomendação inteira; sem nenhum item válido, a resposta vira `NO_CANDIDATES`.
 
 Erros:
 
 - `400 LOCATION_REQUIRED`
 - `400 INTENT_REQUIRED`
-- `502 RECOMMENDATION_FAILED`
+- `404 NO_CANDIDATES`
+- `429 COST_LIMIT_REACHED`
+- `502 PROVIDER_FAILED`
 
-## Translation - futuro
+## Translation
 
 `POST /translations`
 
-Planejado para o MVP. Deve traduzir texto entre idioma nativo e idioma local, com possibilidade futura de áudio, voz e câmera.
+Implementado na Milestone 2. Traduz texto entre idioma nativo e idioma local;
+áudio, voz e câmera ficam para milestones futuras.
+
+Request:
+
+```json
+{
+  "text": "Bom dia",
+  "sourceLanguage": "pt",
+  "targetLanguage": "en"
+}
+```
+
+Response:
+
+```json
+{
+  "translatedText": "good morning",
+  "sourceLanguage": "pt",
+  "targetLanguage": "en",
+  "isMock": true,
+  "provider": "fake-translation",
+  "estimatedCost": 0
+}
+```
+
+Erros:
+
+- `400 TRANSLATION_INPUT_REQUIRED`
+- `429 COST_LIMIT_REACHED`
+- `502 PROVIDER_FAILED`
+
+## Affiliates
+
+Implementado na Milestone 2. `FakeAffiliateProvider` por padrão: toda oferta vem
+com `isMock: true` e `trackedUrl` para `example.com`, porque não há parceria real.
+
+`GET /affiliates?placeId=&category=&city=`
+
+Response:
+
+```json
+{
+  "offers": [
+    {
+      "id": "mock-offer-city-pass",
+      "partner": "Parceiro exemplo",
+      "title": "Passe da cidade",
+      "priceFrom": "EUR 25",
+      "trackedUrl": "https://example.com/ofertas/city-pass?ref=vamba-mock",
+      "isMock": true
+    }
+  ]
+}
+```
+
+`POST /affiliates/clicks`
+
+Request:
+
+```json
+{
+  "offerId": "mock-offer-city-pass",
+  "placeId": "mock-lisbon-square"
+}
+```
+
+Response: `202 { "recorded": true }`
+
+Erros:
+
+- `400 OFFER_REQUIRED`
+
+Rota pública, sem rate limit (`server/src/routes/affiliates.routes.ts`) — o log de
+cliques do provider fake guarda no máximo os 1000 mais recentes.

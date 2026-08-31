@@ -23,30 +23,27 @@ export const useFavorites = () => {
     };
   }, []);
 
-  const persist = useCallback((updated: Favorite[]) => {
-    void saveJson(FAVORITES_KEY, updated);
-    return updated;
+  // Persistir depois do carregamento inicial: sem isso, o estado [] do
+  // primeiro render sobrescreveria o storage antes do load resolver.
+  useEffect(() => {
+    if (isLoaded) {
+      void saveJson(FAVORITES_KEY, favorites);
+    }
+  }, [favorites, isLoaded]);
+
+  const remove = useCallback((placeId: string) => {
+    setFavorites((prev) => prev.filter((favorite) => favorite.id !== placeId));
   }, []);
 
-  const remove = useCallback(
-    (placeId: string) => {
-      setFavorites((prev) => persist(prev.filter((favorite) => favorite.id !== placeId)));
-    },
-    [persist],
-  );
+  const save = useCallback((item: RecommendationItem) => {
+    setFavorites((prev) => {
+      if (prev.some((favorite) => favorite.id === item.place.id)) {
+        return prev;
+      }
 
-  const save = useCallback(
-    (item: RecommendationItem) => {
-      setFavorites((prev) => {
-        if (prev.some((favorite) => favorite.id === item.place.id)) {
-          return prev;
-        }
-
-        return persist([...prev, { ...item.place, savedAt: new Date().toISOString() }]);
-      });
-    },
-    [persist],
-  );
+      return [...prev, { ...item.place, savedAt: new Date().toISOString() }];
+    });
+  }, []);
 
   const isFavorited = useCallback(
     (placeId: string) => favorites.some((favorite) => favorite.id === placeId),

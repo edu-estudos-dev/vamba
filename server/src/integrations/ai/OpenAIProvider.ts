@@ -1,12 +1,17 @@
 import type { AIProvider, RankedPlace } from './AIProvider.js';
 
 export class OpenAIProvider implements AIProvider {
-  readonly providerName = 'openai';
+  // Inclui o modelo para que `pricing.ts` cobre o preco certo: trocar
+  // OPENAI_MODEL no .env muda o custo real por chamada, e o nome do provider
+  // e a chave que RecommendationService usa para consultar o preco.
+  readonly providerName: string;
 
   constructor(
     private readonly apiKey: string,
     private readonly model: string,
-  ) {}
+  ) {
+    this.providerName = `openai:${model}`;
+  }
 
   async rankPlaces(input: Parameters<AIProvider['rankPlaces']>[0]): Promise<RankedPlace[]> {
     if (!this.apiKey) {
@@ -16,6 +21,10 @@ export class OpenAIProvider implements AIProvider {
     const candidateIds = new Set(input.candidates.map((candidate) => candidate.id));
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
+      // Sem teto de tempo, um provider que so demora prende o request Express
+      // e o turista com o spinner travado (os botoes do app ficam desabilitados
+      // enquanto isLoading e true) por ate o timeout padrao do Node (~300s).
+      signal: AbortSignal.timeout(8_000),
       headers: {
         Authorization: `Bearer ${this.apiKey}`,
         'Content-Type': 'application/json',
