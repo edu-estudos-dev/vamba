@@ -21,6 +21,9 @@ export const AnalyticsScreen = ({ events, onClear }: AnalyticsScreenProps) => {
     favorite_saved: '❤️ Favoritos salvos',
     favorite_removed: '🗑️ Favoritos removidos',
     map_opened: '🗺️ Mapas abertos',
+    onboarding_completed: '👋 Onboarding concluído',
+    translation_requested: '🌐 Traduções pedidas',
+    offer_clicked: '🎟️ Ofertas clicadas',
   };
 
   return (

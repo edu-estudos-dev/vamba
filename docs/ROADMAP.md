@@ -37,6 +37,12 @@ Status: implementada com providers fake/mock por padrão e adapters reais prepar
 - UX melhorada.
 - Tratamento de erros.
 
+Status: implementada. Detalhes em `MILESTONE_2.md`.
+
+Tradutor e afiliado rodam com providers fake por padrão, marcados como mock na tela.
+O teto diário de custo (`DAILY_COST_LIMIT_USD`) protege o momento em que os providers
+reais forem ativados.
+
 ## Milestone 3 - Validação
 
 Distribuir para usuários reais e medir uso, retenção, custos, cliques, conversões e feedback.

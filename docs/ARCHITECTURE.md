@@ -36,8 +36,8 @@ RecommendationController
 - `PlacesProvider`
 - `RoutesProvider`
 - `AIProvider`
-- `TranslationProvider`
-- `AffiliateProvider`
+- `TranslationProvider` (`FakeTranslationProvider`, `GoogleTranslationProvider`)
+- `AffiliateProvider` (`FakeAffiliateProvider`)
 
 Fornecedores possíveis futuros: Google Places API, Google Maps Platform, Google Routes API, OpenAI API, Google Cloud Translation e parceiros afiliados.
 
@@ -68,6 +68,16 @@ Regras técnicas:
 - `OpenAIProvider` usa saída estruturada e valida IDs contra a lista de candidatos.
 - `ApiUsageLogger` registra provider, operação, unidades aproximadas e custo estimado.
 
+## Persistência local no mobile (Milestone 2)
+
+Favoritos e analytics ficam apenas no dispositivo, via `@react-native-async-storage/async-storage`,
+acessado por `mobile/src/lib/storage.ts`.
+
+- Não usar `localStorage`: a Web Storage API só existe no Expo Web e quebra em iOS/Android.
+  Há um teste em `mobile/src/lib/storage.test.ts` que falha se `localStorage` reaparecer no app.
+- O log de analytics guarda no máximo os 500 eventos mais recentes.
+- Migrar para PostgreSQL quando favoritos precisarem sincronizar entre dispositivos.
+
 ## Segurança
 
 - Nunca versionar `.env`.
@@ -82,3 +92,7 @@ Regras técnicas:
 Preparar o conceito de `api_usage` com provider, operação, unidades de entrada/saída, custo estimado e data. Não é obrigatório criar tabela no bootstrap.
 
 Na Milestone 1, o log é em memória por request. Banco persistente fica para uma milestone posterior.
+
+Na Milestone 2, `CostGuard` passou a somar o custo estimado do dia por processo e a
+recusar chamadas pagas com `429 COST_LIMIT_REACHED` acima de `DAILY_COST_LIMIT_USD`.
+Preços por operação ficam em `server/src/config/pricing.ts`.
