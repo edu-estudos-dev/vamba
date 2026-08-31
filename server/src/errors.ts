@@ -33,16 +33,23 @@ export class AppError extends Error {
   }
 }
 
+const PROVIDER_FAILED_MESSAGE = 'Falha inesperada ao falar com um provider externo.';
+
+/**
+ * Mensagem de erro de validacao e escrita por nos e pode ir para o cliente.
+ * Mensagem de `PROVIDER_FAILED` nao: ela carrega o corpo cru da resposta do
+ * provider (chave recusada, id inventado pelo modelo, stack de SDK). Esse
+ * detalhe fica no log do servidor e a resposta HTTP leva so a frase generica.
+ */
 export const toErrorResponse = (error: unknown): { status: number; body: { error: AppErrorCode; message: string } } => {
-  if (error instanceof AppError) {
+  if (error instanceof AppError && error.code !== 'PROVIDER_FAILED') {
     return { status: error.status, body: { error: error.code, message: error.message } };
   }
 
+  console.error('provider.failed', error);
+
   return {
     status: statusByCode.PROVIDER_FAILED,
-    body: {
-      error: 'PROVIDER_FAILED',
-      message: error instanceof Error ? error.message : 'Falha inesperada ao falar com um provider externo.',
-    },
+    body: { error: 'PROVIDER_FAILED', message: PROVIDER_FAILED_MESSAGE },
   };
 };

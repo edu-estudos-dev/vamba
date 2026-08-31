@@ -181,6 +181,110 @@ describe('RecommendationService', () => {
         intent: { category: 'Conhecer' },
         travelMode: 'walking',
       }),
-    ).rejects.toThrow('AIProvider returned an unknown place id: invented-place');
+    ).rejects.toThrow('Nao foi possivel montar uma recomendacao');
+  });
+
+  it('descarta o id inventado pela IA e mantem os candidatos validos', async () => {
+    const placesProvider: PlacesProvider = {
+      async search() {
+        return [
+          {
+            id: 'real-a',
+            name: 'Real A',
+            category: 'museum',
+            latitude: 38.72,
+            longitude: -9.13,
+            distanceMeters: 300,
+            rating: 4.7,
+            reviewCount: 100,
+            isOpenNow: true,
+          },
+          {
+            id: 'real-b',
+            name: 'Real B',
+            category: 'cafe',
+            latitude: 38.721,
+            longitude: -9.131,
+            distanceMeters: 400,
+            rating: 4.5,
+            reviewCount: 80,
+            isOpenNow: true,
+          },
+        ];
+      },
+    };
+
+    // O modelo devolve um id inventado no topo e repete um valido no fim:
+    // nenhum dos dois pode derrubar a recomendacao inteira.
+    const aiProvider: AIProvider = {
+      async rankPlaces() {
+        return [
+          { placeId: 'invented-place', rank: 1, explanation: 'Alucinacao.' },
+          { placeId: 'real-b', rank: 2, explanation: 'Valido.' },
+          { placeId: 'real-a', rank: 3, explanation: 'Valido.' },
+          { placeId: 'real-b', rank: 4, explanation: 'Duplicado.' },
+        ];
+      },
+    };
+
+    const service = new RecommendationService({
+      placesProvider,
+      aiProvider,
+      usageLogger: new InMemoryApiUsageLogger(),
+      costGuard: new CostGuard(5),
+    });
+
+    const result = await service.recommend({
+      location: { latitude: 38.72, longitude: -9.13 },
+      intent: { category: 'Conhecer' },
+      travelMode: 'walking',
+    });
+
+    expect(result.recommendations.map((item) => item.place.id)).toEqual(['real-b', 'real-a']);
+    // Renumerado: sem buraco na contagem que vai para a tela.
+    expect(result.recommendations.map((item) => item.rank)).toEqual([1, 2]);
+    expect(result.primaryRecommendation.place.id).toBe('real-b');
+  });
+
+  it('nao chama a IA quando a busca de lugares ja estourou o teto diario', async () => {
+    const placesProvider: PlacesProvider = {
+      providerName: 'google-places',
+      async search() {
+        return [
+          {
+            id: 'real-a',
+            name: 'Real A',
+            category: 'museum',
+            latitude: 38.72,
+            longitude: -9.13,
+            distanceMeters: 300,
+            rating: 4.7,
+            reviewCount: 100,
+            isOpenNow: true,
+          },
+        ];
+      },
+    };
+
+    const rankPlaces = vi.fn();
+    const aiProvider = { providerName: 'openai', rankPlaces } as unknown as AIProvider;
+
+    // Teto que sobra menos que o custo de uma busca: a busca passa, a IA nao.
+    const service = new RecommendationService({
+      placesProvider,
+      aiProvider,
+      usageLogger: new InMemoryApiUsageLogger(),
+      costGuard: new CostGuard(0.01),
+    });
+
+    await expect(
+      service.recommend({
+        location: { latitude: 38.72, longitude: -9.13 },
+        intent: { category: 'Conhecer' },
+        travelMode: 'walking',
+      }),
+    ).rejects.toThrow('Limite diario de custo');
+
+    expect(rankPlaces).not.toHaveBeenCalled();
   });
 });

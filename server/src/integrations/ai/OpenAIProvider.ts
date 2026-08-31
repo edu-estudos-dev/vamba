@@ -88,12 +88,19 @@ export class OpenAIProvider implements AIProvider {
 
     const parsed = JSON.parse(text) as { rankings?: RankedPlace[] };
     const rankings = parsed.rankings ?? [];
-    const unknown = rankings.find((ranking) => !candidateIds.has(ranking.placeId));
 
-    if (unknown) {
-      throw new Error(`OpenAI returned an unknown place id: ${unknown.placeId}`);
+    // O modelo as vezes inventa um id apesar da instrucao. Descartar so o item
+    // preserva os validos — e a busca de lugares que ja foi paga. Se nao sobrar
+    // nenhum, quem chama trata como "sem candidatos".
+    const known = rankings.filter((ranking) => candidateIds.has(ranking.placeId));
+
+    if (known.length < rankings.length) {
+      console.warn('openai.invented_place_ids', {
+        discarded: rankings.length - known.length,
+        of: rankings.length,
+      });
     }
 
-    return rankings;
+    return known;
   }
 }

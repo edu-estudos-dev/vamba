@@ -57,6 +57,10 @@ export class RecommendationService {
       );
     }
 
+    // A busca de lugares ja cobrou. Sem checar de novo, uma chamada de IA sai
+    // por cima de um teto que ja estourou.
+    this.costGuard.assertWithinBudget();
+
     const rankings = await this.aiProvider.rankPlaces({
       prompt: this.buildPrompt(request),
       candidates,
@@ -118,32 +122,36 @@ export class RecommendationService {
     const candidatesById = new Map(candidates.map((candidate) => [candidate.id, candidate]));
     const seenPlaceIds = new Set<string>();
 
+    // O modelo as vezes inventa ou repete um id. Derrubar a resposta inteira por
+    // causa de um item ruim joga fora os validos e o dinheiro ja gasto na busca:
+    // descarta so o item e segue. Ficar sem nenhum vira `NO_CANDIDATES` em `recommend`.
     return rankings
       .sort((left, right) => left.rank - right.rank)
-      .map((ranking) => {
+      .flatMap((ranking) => {
         const place = candidatesById.get(ranking.placeId);
 
-        if (!place) {
-          throw new AppError(
-            'PROVIDER_FAILED',
-            `AIProvider returned an unknown place id: ${ranking.placeId}`,
-          );
-        }
+        if (!place || seenPlaceIds.has(ranking.placeId)) {
+          console.warn('ai.invalid_ranking', {
+            provider: this.aiProvider.providerName,
+            placeId: ranking.placeId,
+            reason: place ? 'duplicate' : 'unknown',
+          });
 
-        if (seenPlaceIds.has(ranking.placeId)) {
-          throw new AppError(
-            'PROVIDER_FAILED',
-            `AIProvider returned a duplicate place id: ${ranking.placeId}`,
-          );
+          return [];
         }
 
         seenPlaceIds.add(ranking.placeId);
 
-        return {
-          place,
-          rank: ranking.rank,
-          explanation: ranking.explanation,
-        };
-      });
+        return [
+          {
+            place,
+            rank: ranking.rank,
+            explanation: ranking.explanation,
+          },
+        ];
+      })
+      // O rank vai para a tela como "1.", "2."... Renumerar evita o buraco que um
+      // item descartado deixaria na contagem.
+      .map((item, index) => ({ ...item, rank: index + 1 }));
   }
 }
