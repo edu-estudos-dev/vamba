@@ -81,8 +81,13 @@ Saída estruturada exigida:
 
 Proteção anti-alucinação:
 
-- `OpenAIProvider` valida IDs retornados contra a lista fornecida.
-- `RecommendationService` também rejeita qualquer ID desconhecido.
+- `OpenAIProvider` valida os IDs retornados contra a lista fornecida e descarta
+  os que não estiverem nela.
+- `RecommendationService` aplica a mesma regra, como rede para outros AIProviders,
+  e também descarta IDs repetidos.
+- Um ID inventado tira aquele item da lista, não a recomendação inteira: derrubar
+  tudo jogaria fora as sugestões válidas e a busca de lugares que já foi paga.
+  Sem nenhum item válido, a resposta vira `NO_CANDIDATES`.
 
 ## Estimativa de chamadas por recomendação
 
