@@ -58,6 +58,10 @@ export class FakeAffiliateProvider implements AffiliateProvider {
 
   private clicks: Array<{ offerId: string; placeId?: string; at: string }> = [];
 
+  // A rota de clique e publica e sem rate limit: sem teto, um POST em loop
+  // esgota a heap do processo e derruba tambem recomendacoes e traducoes.
+  private static readonly MAX_CLICKS = 1_000;
+
   async getOffers(input: { placeId?: string; category?: string; city?: string }): Promise<AffiliateOffer[]> {
     const matched = input.category ? offersByCategory[input.category] : undefined;
     return matched ?? [fallbackOffer];
@@ -66,7 +70,9 @@ export class FakeAffiliateProvider implements AffiliateProvider {
   async recordClick(input: { offerId: string; placeId?: string }): Promise<void> {
     // ponytail: cliques ficam em memoria e somem no restart. Persistir na Milestone 3,
     // quando o numero de cliques passar a sustentar decisao de negocio.
-    this.clicks.push({ ...input, at: new Date().toISOString() });
+    this.clicks = [...this.clicks, { ...input, at: new Date().toISOString() }].slice(
+      -FakeAffiliateProvider.MAX_CLICKS,
+    );
   }
 
   getClicks(): ReadonlyArray<{ offerId: string; placeId?: string; at: string }> {

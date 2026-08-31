@@ -89,6 +89,15 @@ No mobile, `src/lib/apiClient.ts` traduz cada código em uma frase para o usuár
 O JSON cru do provider nunca aparece na tela — antes disso, um erro do Google Places
 vazava a resposta inteira da API para o turista.
 
+## Segurança das rotas novas
+
+`CORS_ORIGIN` aceita uma lista separada por vírgula e é aplicada de verdade em
+`app.ts`. Sem isso, qualquer site poderia chamar `/translations` do navegador de um
+visitante e queimar a cota diária — com provider real, isso é dinheiro.
+
+`/affiliates/clicks` é público e sem rate limit; o log de cliques do provider fake
+guarda no máximo os 1000 mais recentes para que um POST em loop não esgote a heap.
+
 ## Como rodar
 
 ```bash

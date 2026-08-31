@@ -242,7 +242,11 @@ export const RecommendationFlow = ({ onToggleFavorite, isFavorited, onTrack }: R
               key={offer.id}
               onPress={() => {
                 onTrack?.('offer_clicked', { offerId: offer.id, placeId: selectedItem.place.id });
-                void recordOfferClick({ offerId: offer.id, placeId: selectedItem.place.id });
+                // Registro do clique e best-effort: falhar aqui nao pode impedir
+                // o usuario de abrir a oferta, nem virar unhandled rejection.
+                recordOfferClick({ offerId: offer.id, placeId: selectedItem.place.id }).catch(
+                  () => undefined,
+                );
                 void Linking.openURL(offer.trackedUrl);
               }}
               style={styles.offer}

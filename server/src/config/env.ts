@@ -26,14 +26,20 @@ const readPositiveNumber = (value: string | undefined, fallback: number, name: s
   return parsed;
 };
 
+/** Aceita varias origens separadas por virgula, para dev web e device na mesma rede. */
+const readList = (value: string | undefined, fallback: string[]): string[] => {
+  const items = (value ?? '').split(',').map((item) => item.trim()).filter(Boolean);
+
+  return items.length > 0 ? items : fallback;
+};
+
 export const env = {
   nodeEnv: process.env.NODE_ENV ?? 'development',
   port: readPort(process.env.PORT),
-  corsOrigin: process.env.CORS_ORIGIN ?? 'http://localhost:8081',
+  corsOrigins: readList(process.env.CORS_ORIGIN, ['http://localhost:8081']),
   placesProvider: process.env.PLACES_PROVIDER ?? 'fake',
   aiProvider: process.env.AI_PROVIDER ?? 'fake',
   translationProvider: process.env.TRANSLATION_PROVIDER ?? 'fake',
-  affiliateProvider: process.env.AFFILIATE_PROVIDER ?? 'fake',
   googleMapsApiKey: process.env.GOOGLE_MAPS_API_KEY ?? '',
   googleTranslateApiKey: process.env.GOOGLE_TRANSLATE_API_KEY ?? '',
   openaiApiKey: process.env.OPENAI_API_KEY ?? '',

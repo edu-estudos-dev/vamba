@@ -2,6 +2,7 @@ import request from 'supertest';
 import { describe, expect, it } from 'vitest';
 
 import { createApp } from '../src/app.js';
+import { FakeAffiliateProvider } from '../src/integrations/affiliates/FakeAffiliateProvider.js';
 
 describe('/affiliates', () => {
   it('devolve ofertas da categoria e marca todas como mock', async () => {
@@ -41,5 +42,21 @@ describe('/affiliates', () => {
 
     expect(response.status).toBe(400);
     expect(response.body.error).toBe('OFFER_REQUIRED');
+  });
+});
+
+describe('FakeAffiliateProvider', () => {
+  it('mantem o log de cliques limitado para nao esgotar a memoria do processo', async () => {
+    const provider = new FakeAffiliateProvider();
+
+    for (let index = 0; index < 1_200; index += 1) {
+      await provider.recordClick({ offerId: `offer-${index}` });
+    }
+
+    const clicks = provider.getClicks();
+
+    expect(clicks).toHaveLength(1_000);
+    // Mantem os mais recentes, que sao os uteis para decisao de negocio.
+    expect(clicks[clicks.length - 1]?.offerId).toBe('offer-1199');
   });
 });
