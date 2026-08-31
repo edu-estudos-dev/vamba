@@ -4,6 +4,7 @@ import {
   Linking,
   Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -97,7 +98,7 @@ export const RecommendationFlow = ({ onSaveFavorite, isFavorited }: Recommendati
   };
 
   return (
-    <View style={styles.container}>
+    <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
       <View style={styles.header}>
         <Text style={styles.brand}>Vamba</Text>
         <Text style={styles.subtitle}>Decida o que vale a pena fazer agora.</Text>
@@ -191,7 +192,7 @@ export const RecommendationFlow = ({ onSaveFavorite, isFavorited }: Recommendati
           Chamadas registradas: {recommendation.usageEvents.map((event) => event.provider).join(', ')}.
         </Text>
       ) : null}
-    </View>
+    </ScrollView>
   );
 };
 
@@ -210,6 +211,8 @@ const formatDistance = (distanceMeters?: number) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  contentContainer: {
     gap: 18,
     paddingHorizontal: 20,
     paddingVertical: 24,
