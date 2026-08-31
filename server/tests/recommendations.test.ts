@@ -74,6 +74,65 @@ describe('POST /recommendations', () => {
 
     expect(infoSpy).not.toHaveBeenCalled();
   });
+
+  it('returns all recommendations with ranking order', async () => {
+    const response = await request(createApp())
+      .post('/recommendations')
+      .send({
+        location: { latitude: 38.7223, longitude: -9.1393 },
+        intent: { category: 'Comer', prompt: 'Restaurante com piscina' },
+      });
+
+    expect(response.status).toBe(200);
+    expect(response.body.recommendations.length).toBeGreaterThan(1);
+    expect(response.body.recommendations[0].rank).toBe(1);
+    expect(response.body.recommendations[1].rank).toBe(2);
+  });
+
+  it('requires intent with category or prompt', async () => {
+    const response = await request(createApp())
+      .post('/recommendations')
+      .send({
+        location: { latitude: 38.7223, longitude: -9.1393 },
+        intent: {},
+      });
+
+    expect(response.status).toBe(400);
+    expect(response.body.error).toBe('INTENT_REQUIRED');
+  });
+
+  it('respects locale param', async () => {
+    const response = await request(createApp())
+      .post('/recommendations')
+      .send({
+        location: { latitude: 38.7223, longitude: -9.1393 },
+        intent: { prompt: 'Test' },
+        locale: 'en-US',
+      });
+
+    expect(response.status).toBe(200);
+    expect(response.body.recommendations[0].place).toHaveProperty('id');
+  });
+
+  it('response includes all required fields', async () => {
+    const response = await request(createApp())
+      .post('/recommendations')
+      .send({
+        location: { latitude: 38.7223, longitude: -9.1393 },
+        intent: { category: 'Conhecer' },
+      });
+
+    expect(response.status).toBe(200);
+    expect(response.body).toHaveProperty('recommendationId');
+    expect(response.body).toHaveProperty('generatedAt');
+    expect(response.body).toHaveProperty('primaryRecommendation');
+    expect(response.body).toHaveProperty('recommendations');
+    expect(response.body).toHaveProperty('usageEvents');
+    expect(response.body.primaryRecommendation.place).toHaveProperty('id');
+    expect(response.body.primaryRecommendation.place).toHaveProperty('name');
+    expect(response.body.primaryRecommendation.place).toHaveProperty('latitude');
+    expect(response.body.primaryRecommendation.place).toHaveProperty('longitude');
+  });
 });
 
 describe('RecommendationService', () => {
